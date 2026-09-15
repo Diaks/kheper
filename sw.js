@@ -1,5 +1,5 @@
 /* Kheper — service worker. Incrémente VERSION à chaque déploiement pour forcer la mise à jour du cache. */
-const VERSION = 'kheper-v1.0.0';
+const VERSION = 'kheper-v1.0.1';
 const FORMS = ['00-base', '07-reveil', '14-degrossi', '21-affute', '30-homme', '60-eveil', '90-ascension', '120-ascension2', '180-tempete', '270-titan', '365-ultime'];
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', ...FORMS.map(f => `./img/${f}.webp`)];
 
