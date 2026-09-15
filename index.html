@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0712">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Kheper</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Manrope:wght@400;600;700&display=swap">
+<style>
+  :root{
+    --ground:#0b0712; --ground-2:#150c22; --card:#160d24; --card-2:#1d1230; --line:rgba(180,124,255,.16);
+    --ink:#ece4f5; --muted:#8f82a6; --violet:#7b2cbf; --violet-2:#b47cff; --gold:#d4af37; --gold-2:#f2c94c; --blue:#4cc9f0;
+    --ok:#7fd88a; --ex:#f2c94c; --exko:#f08a4b; --ko:#e0556b; --oubli:#6b5a7a;
+    --display:'Cinzel',Georgia,serif; --body:'Manrope',system-ui,-apple-system,sans-serif;
+    --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;
+       overflow:hidden;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;overscroll-behavior:none}
+  [hidden]{display:none!important}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column}
+  header{flex:none;display:flex;align-items:center;justify-content:space-between;padding:calc(8px + var(--sat)) 16px 6px;
+         background:var(--ground)}
+  header h1{margin:0;font-family:var(--display);font-weight:900;font-size:17px;letter-spacing:.3em;color:var(--gold-2)}
+  #sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  #sync i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+  #sync[data-s="ok"] i{background:var(--ok)} #sync[data-s="pending"] i,#sync[data-s="syncing"] i{background:var(--gold-2)}
+  #sync[data-s="error"] i{background:var(--ko)} #sync[data-s="offline"] i{background:var(--exko)}
+  main{flex:1;min-height:0;position:relative}
+  .tab{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:0 16px 24px}
+  nav{flex:none;display:grid;grid-template-columns:repeat(4,1fr);background:var(--ground);border-top:1px solid var(--line);
+      padding:6px 8px calc(8px + var(--sab))}
+  nav button{background:none;border:0;color:var(--muted);font:600 11px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;
+             padding:8px 4px 6px;display:flex;flex-direction:column;align-items:center;gap:5px;border-radius:10px;cursor:pointer}
+  nav button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  nav button.on{color:var(--gold-2)}
+  nav button:focus-visible{outline:2px solid var(--gold-2)}
+
+  /* ---- scène ---- */
+  #stage{position:relative;height:58vh;min-height:380px;margin:0 -16px;overflow:hidden;
+         background:radial-gradient(120% 70% at 50% 100%,var(--ground-2) 0%,var(--ground) 60%)}
+  #stage canvas{position:absolute;inset:0;width:100%;height:100%}
+  #char{position:absolute;left:0;top:0;width:100%;height:100%;will-change:transform}
+  #char img{position:absolute;left:50%;top:0;height:100%;width:auto;transform:translateX(-50%);transition:opacity .6s ease;
+            will-change:opacity,filter;pointer-events:none;-webkit-user-drag:none}
+  #imgB{opacity:0}
+  #flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+  #hud{position:absolute;left:0;right:0;bottom:0;padding:0 20px 10px;text-align:center;pointer-events:none;
+       background:linear-gradient(to top,rgba(11,7,18,.95) 30%,rgba(11,7,18,0))}
+  #power{font-family:var(--display);font-weight:900;font-size:clamp(52px,13vw,80px);line-height:1;color:var(--gold-2);
+         font-variant-numeric:tabular-nums;letter-spacing:.02em;text-shadow:0 0 24px rgba(242,201,76,.35)}
+  #power small{font-size:.42em;font-weight:700;color:var(--muted);letter-spacing:.1em;margin-left:.2em;vertical-align:.3em}
+  #formName{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:.14em;text-transform:uppercase;margin-top:4px}
+  #bar{height:5px;border-radius:3px;background:rgba(180,124,255,.18);margin:10px auto 5px;max-width:320px;overflow:hidden}
+  #bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--violet-2),var(--gold-2));border-radius:3px;transition:width .6s ease}
+  #next{font-size:13px;color:var(--muted);letter-spacing:.04em}
+  #banner{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;
+          pointer-events:none;opacity:0;background:radial-gradient(60% 50% at 50% 50%,rgba(11,7,18,.85),rgba(11,7,18,0))}
+  #banner b{font-family:var(--display);font-weight:900;font-size:clamp(32px,9vw,60px);letter-spacing:.12em;text-transform:uppercase;
+            color:var(--gold-2);text-align:center;text-shadow:0 0 30px rgba(242,201,76,.55);text-wrap:balance;padding:0 16px}
+  #banner span{font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--violet-2)}
+
+  /* ---- accueil ---- */
+  .alert{margin:14px 0 0;padding:10px 14px;border-radius:12px;background:rgba(240,138,75,.12);border:1px solid rgba(240,138,75,.4);
+         color:#ffd2b3;font-size:13px;font-weight:600;display:flex;gap:10px;align-items:center}
+  .alert.oubli{background:rgba(224,85,107,.1);border-color:rgba(224,85,107,.4);color:#ffc3cd}
+  .days{display:grid;gap:10px;margin-top:14px}
+  .day{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px 14px}
+  .day h3{margin:0 0 2px;font:700 13px/1.2 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--violet-2);
+          display:flex;justify-content:space-between;align-items:baseline}
+  .day h3 span{color:var(--muted);letter-spacing:0;text-transform:none;font-weight:600}
+  .day .st{font-size:13px;color:var(--muted);min-height:18px;margin-bottom:8px}
+  .day .st.ok{color:var(--ok)} .day .st.ex{color:var(--ex)} .day .st.exko{color:var(--exko)} .day .st.ko{color:var(--ko)}
+  .btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .btns button{font:700 15px/1 var(--body);color:var(--ink);background:var(--card-2);border:1px solid var(--line);border-radius:12px;
+               padding:0;height:52px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+  .btns button small{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  .btns button:active{transform:translateY(1px)}
+  .btns button:focus-visible{outline:2px solid var(--gold-2);outline-offset:2px}
+  .btns button.sel{border-color:var(--gold-2);box-shadow:0 0 0 1px var(--gold-2) inset,0 0 18px rgba(242,201,76,.2)}
+  .btns button.sel.ok{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok) inset,0 0 18px rgba(127,216,138,.2)}
+  .btns button.sel.ko{border-color:var(--ko);box-shadow:0 0 0 1px var(--ko) inset,0 0 18px rgba(224,85,107,.2)}
+  .btns button:disabled{opacity:.35;cursor:default}
+  .day.locked .btns{display:none}
+  .rules{margin-top:18px}
+  .rules h2{font-family:var(--display);font-size:13px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;font-weight:700}
+  .rules pre{margin:0;white-space:pre-wrap;font:400 14px/1.55 var(--body);color:var(--ink);background:var(--card);
+             border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+
+  /* ---- calendrier ---- */
+  .calhead{display:flex;align-items:center;justify-content:space-between;padding:14px 0 10px}
+  .calhead b{font-family:var(--display);font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-2)}
+  .calhead button{background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:10px;width:44px;height:40px;font-size:18px;cursor:pointer}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .grid .wd{text-align:center;font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted);padding:4px 0 6px}
+  .cell{aspect-ratio:1;border-radius:12px;background:var(--card);border:1px solid var(--line);display:flex;flex-direction:column;
+        align-items:center;justify-content:center;font-size:14px;font-weight:600;position:relative;cursor:pointer;color:var(--ink)}
+  .cell.empty{background:none;border-color:transparent;cursor:default}
+  .cell.before{opacity:.25;cursor:default}
+  .cell.future{opacity:.3;cursor:default}
+  .cell.today{border-color:var(--gold-2);box-shadow:0 0 0 1px var(--gold-2) inset}
+  .cell.ok{background:rgba(127,216,138,.22);border-color:rgba(127,216,138,.5)}
+  .cell.ex{background:rgba(242,201,76,.2);border-color:rgba(242,201,76,.5)}
+  .cell.exko{background:rgba(240,138,75,.2);border-color:rgba(240,138,75,.5)}
+  .cell.ko{background:rgba(224,85,107,.22);border-color:rgba(224,85,107,.55)}
+  .cell.oubli{background:rgba(107,90,122,.25);border-color:rgba(107,90,122,.6);color:var(--muted)}
+  .cell.locked{opacity:.55}
+  .cell.locked::after{content:'';position:absolute;right:4px;bottom:4px;width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.7}
+  .cell .dot{font-size:10px;line-height:1;margin-top:2px}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:14px;font-size:12px;color:var(--muted)}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+  /* ---- trophées ---- */
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;text-align:center}
+  .tile b{display:block;font-family:var(--display);font-weight:900;font-size:40px;color:var(--gold-2);line-height:1.1;font-variant-numeric:tabular-nums}
+  .tile span{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .forms{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:6px}
+  .forms li{display:grid;grid-template-columns:48px 56px 1fr;align-items:center;gap:10px;padding:8px 12px 8px 8px;border-radius:14px;
+            background:var(--card);border:1px solid var(--line);opacity:.45}
+  .forms li.done{opacity:1} .forms li.cur{opacity:1;border-color:var(--gold-2);box-shadow:0 0 0 1px var(--gold-2) inset,0 0 20px rgba(242,201,76,.15)}
+  .forms .th{width:48px;height:48px;border-radius:10px;overflow:hidden;background:var(--ground-2)}
+  .forms .th img{width:100%;height:100%;object-fit:cover;object-position:50% 0;transform:scale(2.4);transform-origin:50% 12%}
+  .forms .d{font-family:var(--display);font-weight:700;color:var(--gold-2);font-size:15px}
+  .forms .n{font-weight:700;font-size:14px}
+  .forms .n small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+
+  /* ---- réglages ---- */
+  .sec{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+  .sec h2{margin:0 0 10px;font-family:var(--display);font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .sec p{margin:6px 0;font-size:13px;color:var(--muted)}
+  label.f{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+  input[type=text],input[type=number],input[type=password],textarea{width:100%;background:var(--ground);border:1px solid var(--line);color:var(--ink);
+       border-radius:10px;padding:10px 12px;font:400 14px/1.5 var(--body);-webkit-user-select:text;user-select:text}
+  textarea{min-height:220px;resize:vertical}
+  .btn{font:700 14px/1 var(--body);color:var(--ink);background:var(--card-2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;
+       cursor:pointer;min-height:46px;width:100%;margin-top:8px}
+  .btn:active{transform:translateY(1px)} .btn:focus-visible{outline:2px solid var(--gold-2)}
+  .btn.gold{border-color:rgba(242,201,76,.5);color:var(--gold-2)} .btn.danger{border-color:rgba(224,85,107,.5);color:#ffc3cd}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .switch{display:flex;justify-content:space-between;align-items:center;padding:6px 0}
+  .switch input{width:22px;height:22px;accent-color:var(--gold-2)}
+
+  /* ---- feuilles, toasts ---- */
+  #sheetWrap{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;z-index:20;opacity:0;pointer-events:none;transition:opacity .2s}
+  #sheetWrap.open{opacity:1;pointer-events:auto}
+  #sheet{width:100%;background:var(--card);border-radius:20px 20px 0 0;padding:16px 16px calc(16px + var(--sab));transform:translateY(20px);transition:transform .25s ease;
+         max-height:85vh;overflow:auto}
+  #sheetWrap.open #sheet{transform:none}
+  #sheet h3{margin:0 0 4px;font-family:var(--display);font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-2)}
+  #sheet p{margin:4px 0 10px;color:var(--muted);font-size:13px}
+  #sheet .warn{background:rgba(240,138,75,.12);border:1px solid rgba(240,138,75,.45);color:#ffd2b3;border-radius:12px;padding:10px 12px;font-size:14px;font-weight:600;margin:6px 0 10px}
+  #toasts{position:fixed;left:16px;right:16px;bottom:calc(76px + var(--sab));display:grid;gap:6px;z-index:30;pointer-events:none}
+  .toast{background:#241638;border:1px solid var(--line);color:var(--ink);border-radius:12px;padding:10px 14px;font-size:13px;font-weight:600;
+         box-shadow:0 8px 24px rgba(0,0,0,.4);animation:tin .25s ease}
+  .toast.ko{border-color:rgba(224,85,107,.5)} .toast.ok{border-color:rgba(127,216,138,.5)}
+  @keyframes tin{from{opacity:0;transform:translateY(8px)}}
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
+</style>
+</head>
+<body>
+<div id="app">
+  <header><h1>KHEPER</h1><div id="sync" data-s="nocfg"><i></i><span>local</span></div></header>
+  <main>
+    <!-- ================= ACCUEIL ================= -->
+    <section class="tab" id="tab-accueil">
+      <div id="stage">
+        <canvas id="aura"></canvas>
+        <div id="char"><img id="imgA" alt=""><img id="imgB" alt=""></div>
+        <canvas id="fx"></canvas>
+        <div id="flash"></div>
+        <div id="hud">
+          <div id="power">0</div>
+          <div id="formName">La Base</div>
+          <div id="bar"><i></i></div>
+          <div id="next"></div>
+        </div>
+        <div id="banner"><span>Nouvelle forme</span><b></b></div>
+      </div>
+      <div id="alerts"></div>
+      <div class="days" id="days"></div>
+      <div class="rules"><h2>Mes règles</h2><pre id="rulesView"></pre></div>
+    </section>
+    <!-- ================= CALENDRIER ================= -->
+    <section class="tab" id="tab-cal" hidden>
+      <div class="calhead"><button id="calPrev" aria-label="Mois précédent">‹</button><b id="calTitle"></b><button id="calNext" aria-label="Mois suivant">›</button></div>
+      <div class="grid" id="calGrid"></div>
+      <div class="legend">
+        <span><i style="background:rgba(127,216,138,.6)"></i>Respecté</span><span><i style="background:rgba(242,201,76,.6)"></i>Exception valide</span>
+        <span><i style="background:rgba(240,138,75,.6)"></i>Exception −15</span><span><i style="background:rgba(224,85,107,.6)"></i>Croix</span>
+        <span><i style="background:rgba(107,90,122,.8)"></i>Oubli</span><span><i style="background:var(--muted);border-radius:50%"></i>Verrouillé</span>
+      </div>
+    </section>
+    <!-- ================= TROPHÉES ================= -->
+    <section class="tab" id="tab-troph" hidden>
+      <div class="tiles"><div class="tile"><b id="tRecord">0</b><span>Record</span></div><div class="tile"><b id="tTotal">0</b><span>Jours respectés</span></div></div>
+      <ul class="forms" id="formsList"></ul>
+    </section>
+    <!-- ================= RÉGLAGES ================= -->
+    <section class="tab" id="tab-regl" hidden>
+      <div class="sec"><h2>Règles</h2>
+        <textarea id="rulesEdit" spellcheck="false"></textarea>
+        <button class="btn gold" id="saveRules">Enregistrer les règles</button>
+      </div>
+      <div class="sec"><h2>Série de départ</h2>
+        <p>Jours déjà acquis avant l'app, ajoutés à la puissance de départ.</p>
+        <input type="number" id="baseIn" min="0" step="1" inputmode="numeric">
+        <button class="btn" id="saveBase">Enregistrer la série</button>
+      </div>
+      <div class="sec"><h2>Synchronisation GitHub</h2>
+        <p id="syncDetail">Non configurée.</p>
+        <div class="row2">
+          <div><label class="f" for="ghOwner">Compte</label><input type="text" id="ghOwner" autocapitalize="off" autocorrect="off"></div>
+          <div><label class="f" for="ghRepo">Dépôt privé</label><input type="text" id="ghRepo" autocapitalize="off" autocorrect="off"></div>
+        </div>
+        <label class="f" for="ghToken">Jeton (fine-grained, Contents lecture/écriture)</label>
+        <input type="password" id="ghToken" autocomplete="off" placeholder="github_pat_…">
+        <div class="row2"><button class="btn gold" id="saveGh">Enregistrer</button><button class="btn" id="forceSync">Forcer la synchro</button></div>
+      </div>
+      <div class="sec"><h2>Données</h2>
+        <div class="row2"><button class="btn" id="exportBtn">Exporter JSON</button><button class="btn" id="importBtn">Importer JSON</button></div>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+        <button class="btn" id="copyBtn">Copier le JSON</button>
+      </div>
+      <div class="sec"><h2>Retour</h2>
+        <label class="switch"><span>Vibration</span><input type="checkbox" id="vibIn"></label>
+      </div>
+      <div class="sec"><h2>Remise à zéro</h2>
+        <p>Efface tout : jours, série de départ, règles (retour au texte par défaut). Le dépôt GitHub est aussi remis à vide. Le jeton est conservé.</p>
+        <button class="btn danger" id="resetBtn">Remettre à zéro…</button>
+      </div>
+      <p style="text-align:center;color:var(--muted);font-size:11px;margin-top:20px">Kheper v1 · <span id="ver"></span></p>
+    </section>
+  </main>
+  <nav>
+    <button data-tab="accueil" class="on"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Accueil</button>
+    <button data-tab="cal"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Calendrier</button>
+    <button data-tab="troph"><svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 20h6"/></svg>Trophées</button>
+    <button data-tab="regl"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3.9a7 7 0 0 0-1.8-1L14.5 3h-5l-.3 2.9a7 7 0 0 0-1.8 1L5.1 6 3.1 9.5l2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 1.8 1l.3 3h5l.3-2.9a7 7 0 0 0 1.8-1l2.3.9 2-3.4-2-1.5c.1-.4.1-.7.1-1z"/></svg>Réglages</button>
+  </nav>
+</div>
+<div id="sheetWrap"><div id="sheet"></div></div>
+<div id="toasts"></div>
+
+<script>
+/* =====================================================================
+   KHEPER v1 — moteur + interface. Tout le code est ici.
+   ===================================================================== */
+(() => {
+'use strict';
+const VERSION = '1.0.0';
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ENGINE-START ------------------------------------------------------- */
+const FORMS = [
+  {d:0,   n:'La Base',      f:'00-base',        fx:{}},
+  {d:7,   n:'Le Réveil',    f:'07-reveil',      fx:{}},
+  {d:14,  n:'Le Dégrossi',  f:'14-degrossi',    fx:{}},
+  {d:21,  n:"L'Affûté",     f:'21-affute',      fx:{}},
+  {d:30,  n:"L'Homme",      f:'30-homme',       fx:{haze:1}},
+  {d:60,  n:'Éveil',        f:'60-eveil',       fx:{aura:[76,201,240], ai:.55, parts:{n:18, col:[139,233,255], sp:.35, sz:2.2}}},
+  {d:90,  n:'Ascension',    f:'90-ascension',   fx:{aura:[138,63,252], ai:.7, pulse:1, parts:{n:30, col:[199,125,255], sp:.6, sz:2.5}}},
+  {d:120, n:'Ascension II', f:'120-ascension2', fx:{aura:[123,44,191], ai:.9, pulse:1, parts:{n:45, col:[199,125,255], sp:.8, sz:2.8}, bolts:{rate:.35, col:[224,195,255], w:1.5}}},
+  {d:180, n:'Tempête',      f:'180-tempete',    fx:{aura:[90,24,154],  ai:1,  pulse:1, parts:{n:60, col:[184,161,217], sp:1, sz:2.6, wind:1}, bolts:{rate:.7, col:[230,230,240], w:2}}},
+  {d:270, n:'Titan',        f:'270-titan',      fx:{aura:[106,13,173], ai:1.15, pulse:1, parts:{n:70, col:[212,175,55], sp:1.1, sz:3}, bolts:{rate:1, col:[255,209,102], w:2.5}, cracks:1}},
+  {d:365, n:'Forme ultime', f:'365-ultime',     fx:{aura:'prism', ai:1.3, pulse:1, parts:{n:90, col:[255,209,102], sp:1.2, sz:3.2}, bolts:{rate:1, col:[255,224,138], w:2.5}, rings:1, cracks:1}},
+];
+const STATUSES = ['ok', 'ex_pro', 'ex_perso', 'ko', 'oubli'];
+const PENALTY = 15, PRO_WINDOW = 13; // Pro : aucune autre Pro valide dans [D-13, D-1]
+const DEFAULT_RULES = `Règles du moment
+- manger 1 repas de fruit au petit déjeuner
+- manger 2 repas de fruit au déjeuner
+- prendre un jus carotte / pomme : 800 ml
+- finir toujours par chlorelle 10 g
+- terminer par 7 g de chlorelle
+- manger avant 15h max
+
+Exceptions
+Pro : repas entre collègues, max 1 fois / 2 semaines
+Perso : réunion familiale
+Kotondo : autorisé après 2 jours de fruit, en petite quantité, chlorelle après le repas`;
+
+const pad = n => String(n).padStart(2, '0');
+const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return dstr(d); };
+const todayStr = () => dstr(new Date());
+const nowSec = () => Math.floor(Date.now() / 1000);
+const formFor = p => { let i = 0; for (let k = 0; k < FORMS.length; k++) if (FORMS[k].d <= p) i = k; return i; };
+const emptyData = (today) => ({ version: 1, start: today, base: 0, rules: DEFAULT_RULES, settings_t: 0, days: {} });
+
+/** Fenêtre : D modifiable pendant D et D+1. */
+const isFuture = (d, today) => d > today;
+const isLocked = (d, today) => d < addDays(today, -1);
+/** Jour fermé sans statut = oubli. */
+const isClosed = (d, today) => d <= addDays(today, -2);
+
+/** Rejeu complet. Retourne puissance, record, total respectés, validité de chaque exception, forme. */
+function compute(data, today) {
+  let p = data.base || 0, record = p, respectes = 0;
+  const start = data.start || today;
+  const okDays = new Set(), proValid = [], valid = {}, eff = {};
+  const isOk = x => x < start ? ((data.base || 0) >= daysBetween(x, start)) : okDays.has(x);
+  let d = start, guard = 0;
+  while (d <= today && guard++ < 20000) {
+    const e = data.days[d];
+    let s = e ? e.s : (isClosed(d, today) ? 'oubli' : null);
+    if (s === 'ok') { p++; respectes++; okDays.add(d); }
+    else if (s === 'ex_pro' || s === 'ex_perso') {
+      const full = isOk(addDays(d, -1)) && isOk(addDays(d, -2));
+      const proFree = s !== 'ex_pro' || !proValid.some(x => x >= addDays(d, -PRO_WINDOW));
+      const v = full && proFree; valid[d] = v;
+      if (v) { p++; if (s === 'ex_pro') proValid.push(d); } else p = Math.max(0, p - PENALTY);
+    }
+    else if (s === 'ko' || s === 'oubli') p = Math.max(0, p - PENALTY);
+    if (s) eff[d] = s === 'ex_pro' || s === 'ex_perso' ? (valid[d] ? 'ex' : 'exko') : s;
+    record = Math.max(record, p);
+    d = addDays(d, 1);
+  }
+  return { p, record, respectes, valid, eff, formIdx: formFor(p) };
+}
+function daysBetween(a, b) { return Math.round((parse(b) - parse(a)) / 86400000); }
+
+/** Motif d'invalidité d'une exception posée sur d (null si valide). */
+function exceptionIssue(data, d, kind, today) {
+  const trial = JSON.parse(JSON.stringify(data));
+  trial.days[d] = { s: kind, t: nowSec() };
+  if (d < (trial.start || today)) trial.start = d;
+  const r = compute(trial, today);
+  if (r.valid[d]) return null;
+  const y1 = addDays(d, -1), y2 = addDays(d, -2);
+  const okOf = x => x < trial.start ? (trial.base || 0) >= daysBetween(x, trial.start) : r.eff[x] === 'ok';
+  if (!okOf(y1) || !okOf(y2)) {
+    if (!trial.days[y1] && !isClosed(y1, today) && y1 >= trial.start) return "hier n'est pas encore renseigné : ça compte −15 tant qu'hier n'est pas ✅";
+    return 'les 2 jours précédents ne sont pas pleins : ça compte −15';
+  }
+  return 'repas pro déjà pris dans les 14 derniers jours : ça compte −15';
+}
+
+/** Matérialise les oublis des jours fermés. Retourne les dates nouvellement marquées. */
+function materialize(data, today) {
+  const out = []; let d = data.start || today, guard = 0;
+  while (isClosed(d, today) && guard++ < 20000) { if (!data.days[d]) { data.days[d] = { s: 'oubli', t: nowSec() }; out.push(d); } d = addDays(d, 1); }
+  return out;
+}
+
+/** Fusion locale/distante (spec §8). */
+function merge(local, remote, today) {
+  const out = { version: 1, days: {} };
+  const rs = (remote.settings_t || 0) > (local.settings_t || 0) ? remote : local;
+  out.base = Number(rs.base) || 0; out.rules = typeof rs.rules === 'string' ? rs.rules : DEFAULT_RULES; out.settings_t = rs.settings_t || 0;
+  out.start = [local.start, remote.start].filter(Boolean).sort()[0] || today;
+  const keys = new Set([...Object.keys(local.days || {}), ...Object.keys(remote.days || {})]);
+  for (const k of keys) {
+    const a = local.days?.[k], b = remote.days?.[k];
+    const okA = a && STATUSES.includes(a.s), okB = b && STATUSES.includes(b.s);
+    if (k > today || !/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+    if (okA && !okB) out.days[k] = a; else if (okB && !okA) out.days[k] = b;
+    else if (okA && okB) {
+      if (a.s === 'oubli' && b.s !== 'oubli') out.days[k] = b;
+      else if (b.s === 'oubli' && a.s !== 'oubli') out.days[k] = a;
+      else out.days[k] = (b.t || 0) > (a.t || 0) ? b : a;
+    }
+  }
+  if (out.start > Object.keys(out.days).sort()[0]) out.start = Object.keys(out.days).sort()[0];
+  return out;
+}
+function canon(d) { const days = {}; for (const k of Object.keys(d.days || {}).sort()) days[k] = { s: d.days[k].s, t: d.days[k].t, ...(d.days[k].valid !== undefined ? { valid: d.days[k].valid } : {}) };
+  return JSON.stringify({ version: 1, start: d.start, base: d.base, rules: d.rules, settings_t: d.settings_t || 0, days }); }
+function validateImport(obj) {
+  if (!obj || typeof obj !== 'object') return 'fichier illisible';
+  if (obj.version !== 1) return `version ${obj.version} inconnue (attendu : 1)`;
+  if (obj.days && typeof obj.days !== 'object') return 'champ days invalide';
+  for (const [k, v] of Object.entries(obj.days || {})) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) return `date invalide : ${k}`;
+    if (!v || !STATUSES.includes(v.s)) return `statut inconnu le ${k} : ${v && v.s}`;
+  }
+  return null;
+}
+/* ENGINE-END --------------------------------------------------------- */
+
+if (typeof window === 'undefined') return; // (tests node : le moteur seul est extrait au-dessus)
+
+/* =====================================================================
+   ÉTAT + STOCKAGE
+   ===================================================================== */
+const LS_DATA = 'kheper.v1', LS_LOCAL = 'kheper.local';
+let data, local, calc, today = todayStr();
+function loadLS(k, fb) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch (_) { return fb; } }
+function saveLS(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
+data = loadLS(LS_DATA, null) || emptyData(today);
+if (!data.days) data.days = {}; if (!data.start) data.start = today; if (typeof data.rules !== 'string') data.rules = DEFAULT_RULES;
+local = Object.assign({ owner: 'Diaks', repo: 'kheper-data', token: '', vibrate: true, dirty: false, sha: null, pending: [], lastLaunch: 0 }, loadLS(LS_LOCAL, {}));
+
+function persist(msg) {
+  // remet à jour les `valid` stockés (photo lisible), puis écrit
+  for (const [k, e] of Object.entries(data.days)) if (e.s === 'ex_pro' || e.s === 'ex_perso') e.valid = !!calc.valid[k];
+  saveLS(LS_DATA, data);
+  if (msg) { local.pending.push(msg); local.dirty = true; }
+  saveLS(LS_LOCAL, local); schedulePush();
+}
+function recalc() { calc = compute(data, today); }
+
+/* =====================================================================
+   UI — utilitaires
+   ===================================================================== */
+const vibrate = p => { if (local.vibrate) try { navigator.vibrate && navigator.vibrate(p); } catch (_) {} };
+function toast(msg, cls = '', ms = 3200) { const t = document.createElement('div'); t.className = 'toast ' + cls; t.textContent = msg; $('#toasts').appendChild(t); setTimeout(() => t.remove(), ms); }
+const FR_DAYS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'], FR_MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const fmtDay = s => { const d = parse(s); return `${FR_DAYS[d.getDay()]} ${d.getDate()} ${FR_MONTHS[d.getMonth()].slice(0, 4)}${FR_MONTHS[d.getMonth()].length > 4 ? '.' : ''}`; };
+const fmtShort = s => { const d = parse(s); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`; };
+const STATUS_LABEL = { ok: 'Respecté', ex: 'Exception valide (+1)', exko: 'Exception hors conditions (−15)', ko: 'Croix (−15)', oubli: 'Oubli (−15)' };
+const kindLabel = s => s === 'ex_pro' ? 'Pro' : s === 'ex_perso' ? 'Perso' : '';
+
+/* ---- feuille (bottom sheet) ---- */
+function openSheet(html) { $('#sheet').innerHTML = html; $('#sheetWrap').classList.add('open'); }
+function closeSheet() { $('#sheetWrap').classList.remove('open'); }
+$('#sheetWrap').addEventListener('click', e => { if (e.target === $('#sheetWrap')) closeSheet(); });
+
+/* =====================================================================
+   ACTIONS SUR UN JOUR
+   ===================================================================== */
+function refreshToday() {
+  const t = todayStr();
+  if (t !== today) { today = t; const news = materialize(data, today); recalc(); persist(news.length ? news.map(d => `${d} oubli −15`).join(', ') : null); renderAll(); if (news.length) notifyOublis(news); }
+}
+let oubliNotice = [];
+function notifyOublis(list) { oubliNotice = oubliNotice.concat(list); renderHome(false); }
+
+async function setStatus(d, s) {
+  refreshToday();
+  if (isFuture(d, today) || isLocked(d, today)) { toast('Jour verrouillé', 'ko'); renderAll(); return; }
+  const prev = data.days[d]?.s;
+  if (prev === s) return;
+  if (s === 'ex_pro' || s === 'ex_perso') {
+    const issue = exceptionIssue(data, d, s, today);
+    if (issue) { const ok = await confirmSheet(`Exception ${kindLabel(s)} — ${fmtDay(d)}`, issue); if (!ok) return; }
+  }
+  const before = calc, fromIdx = calc.formIdx;
+  data.days[d] = { s, t: nowSec() };
+  if (d < data.start) data.start = d;
+  recalc();
+  const effNow = calc.eff[d];
+  const msg = `${d} ${s === 'ok' ? '✅' : s === 'ko' ? '❌ −15' : `🟡 ${kindLabel(s).toLowerCase()}${effNow === 'exko' ? ' −15' : ''}`}`;
+  persist(msg);
+  showTab('accueil'); renderAll(false);
+  const up = calc.p > before.p, down = calc.p < before.p;
+  if (up) await fxCoche(fromIdx); else if (down) await fxCroix(fromIdx); else await fxSetPower(fromIdx);
+  renderAll();
+}
+function confirmSheet(title, issue) {
+  return new Promise(res => {
+    openSheet(`<h3>${title}</h3><div class="warn">⚠ ${issue}</div><p>Tu peux confirmer quand même (l'exception sera comptée −15) ou annuler.</p>
+      <div class="row2"><button class="btn" id="shCancel">Annuler</button><button class="btn danger" id="shOk">Confirmer (−15)</button></div>`);
+    $('#shCancel').onclick = () => { closeSheet(); res(false); };
+    $('#shOk').onclick = () => { closeSheet(); res(true); };
+  });
+}
+function exceptionSheet(d) {
+  openSheet(`<h3>Exception — ${fmtDay(d)}</h3><p>Quel type ?</p>
+    <button class="btn gold" id="exPro">Pro — repas entre collègues<br><small style="color:var(--muted);font-weight:600">max 1 fois / 14 jours</small></button>
+    <button class="btn gold" id="exPerso">Perso — réunion familiale, kotondo</button>
+    <button class="btn" id="exCancel">Annuler</button>`);
+  $('#exPro').onclick = () => { closeSheet(); setStatus(d, 'ex_pro'); };
+  $('#exPerso').onclick = () => { closeSheet(); setStatus(d, 'ex_perso'); };
+  $('#exCancel').onclick = closeSheet;
+}
+function daySheet(d) {
+  const e = data.days[d], eff = calc.eff[d];
+  openSheet(`<h3>${fmtDay(d)}</h3><p>${eff ? STATUS_LABEL[eff] + (e && kindLabel(e.s) ? ' · ' + kindLabel(e.s) : '') : 'Non renseigné'}</p>
+    <div class="btns" style="margin-bottom:10px">
+      <button data-s="ok" class="${eff === 'ok' ? 'sel ok' : ''}">✅<small>Respecté</small></button>
+      <button data-s="ex" class="${eff === 'ex' || eff === 'exko' ? 'sel' : ''}">🟡<small>Exception</small></button>
+      <button data-s="ko" class="${eff === 'ko' ? 'sel ko' : ''}">❌<small>Croix</small></button>
+    </div><button class="btn" id="dsClose">Fermer</button>`);
+  $$('#sheet .btns button').forEach(b => b.onclick = () => { closeSheet(); const s = b.dataset.s; s === 'ex' ? exceptionSheet(d) : setStatus(d, s); });
+  $('#dsClose').onclick = closeSheet;
+}
+
+/* =====================================================================
+   RENDU
+   ===================================================================== */
+let activeTab = 'accueil', calMonth = today.slice(0, 7);
+function showTab(t) { activeTab = t; $$('.tab').forEach(s => s.hidden = s.id !== 'tab-' + t); $$('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); if (t === 'accueil') resize(); }
+$$('nav button').forEach(b => b.onclick = () => { showTab(b.dataset.tab); renderAll(); });
+
+function renderAll(withPower = true) { renderHome(withPower); renderCal(); renderTroph(); renderSettings(); renderSync(); }
+
+function renderHome(withPower) {
+  if (withPower) { power = calc.p; if (!animating) { formIdx = calc.formIdx; setForm(formIdx, true); } }
+  renderHud();
+  const y = addDays(today, -1);
+  const al = $('#alerts'); al.innerHTML = '';
+  if (oubliNotice.length) { const a = document.createElement('div'); a.className = 'alert oubli'; a.textContent = `Oubli${oubliNotice.length > 1 ? 's' : ''} : ${oubliNotice.map(fmtShort).join(', ')} — −15 par jour`; al.appendChild(a); }
+  if (!data.days[y] && y >= data.start) { const a = document.createElement('div'); a.className = 'alert'; a.textContent = "Hier n'est pas renseigné — avant minuit, sinon ça compte −15"; al.appendChild(a); }
+  const box = $('#days'); box.innerHTML = '';
+  for (const [label, d] of [["Aujourd'hui", today], ['Hier', y]]) {
+    const e = data.days[d], eff = calc.eff[d]; const before = false;
+    const el = document.createElement('div'); el.className = 'day' + (before ? ' locked' : '');
+    el.innerHTML = `<h3>${label}<span>${fmtDay(d)}</span></h3><div class="st ${eff || ''}">${eff ? STATUS_LABEL[eff] + (e && kindLabel(e.s) ? ' · ' + kindLabel(e.s) : '') : (before ? 'Avant le début' : 'Non renseigné')}</div>
+      <div class="btns">
+        <button data-s="ok" class="${eff === 'ok' ? 'sel ok' : ''}">✅<small>Respecté</small></button>
+        <button data-s="ex" class="${eff === 'ex' || eff === 'exko' ? 'sel' : ''}">🟡<small>Exception</small></button>
+        <button data-s="ko" class="${eff === 'ko' ? 'sel ko' : ''}">❌<small>Croix</small></button>
+      </div>`;
+    el.querySelectorAll('button').forEach(b => b.onclick = () => { const s = b.dataset.s; s === 'ex' ? exceptionSheet(d) : setStatus(d, s); });
+    box.appendChild(el);
+  }
+  $('#rulesView').textContent = data.rules;
+}
+function renderHud() {
+  const f = FORMS[formIdx], nx = FORMS[formIdx + 1];
+  $('#formName').textContent = f.n;
+  if (nx) { $('#bar i').style.width = Math.max(0, Math.round((power - f.d) / (nx.d - f.d) * 100)) + '%'; const n = nx.d - power; $('#next').textContent = `${n} jour${n > 1 ? 's' : ''} avant ${nx.n}`; }
+  else { const k = 100 - ((power - 365) % 100); $('#bar i').style.width = (100 - k) + '%'; $('#next').textContent = `${k} jour${k > 1 ? 's' : ''} avant la prochaine étoile`; }
+  renderPower();
+}
+function renderPower() { const p = Math.round(shownPower); $('#power').innerHTML = p + (power >= 365 ? ' <small>∞' + '★'.repeat(Math.floor((power - 365) / 100)) + '</small>' : ''); }
+
+function renderCal() {
+  const [Y, M] = calMonth.split('-').map(Number);
+  $('#calTitle').textContent = `${FR_MONTHS[M - 1]} ${Y}`;
+  const g = $('#calGrid'); g.innerHTML = '';
+  for (const w of ['L', 'M', 'M', 'J', 'V', 'S', 'D']) { const e = document.createElement('div'); e.className = 'wd'; e.textContent = w; g.appendChild(e); }
+  const first = new Date(Y, M - 1, 1), offset = (first.getDay() + 6) % 7, nDays = new Date(Y, M, 0).getDate();
+  for (let i = 0; i < offset; i++) { const e = document.createElement('div'); e.className = 'cell empty'; g.appendChild(e); }
+  for (let n = 1; n <= nDays; n++) {
+    const d = `${Y}-${pad(M)}-${pad(n)}`, e = data.days[d], eff = calc.eff[d];
+    const c = document.createElement('div'); c.className = 'cell'; c.innerHTML = `<span>${n}</span>`;
+    if (d === today) c.classList.add('today');
+    if (isFuture(d, today)) c.classList.add('future');
+    else if (d < data.start && isLocked(d, today)) c.classList.add('before');
+    else { if (eff) c.classList.add(eff); if (isLocked(d, today)) c.classList.add('locked'); if (e && kindLabel(e.s)) c.innerHTML += `<span class="dot">${kindLabel(e.s) === 'Pro' ? 'pro' : 'perso'}</span>`; }
+    c.onclick = () => { if (isFuture(d, today) || (d < data.start && isLocked(d, today))) return; if (isLocked(d, today)) { toast(`${fmtDay(d)} — verrouillé`); return; } daySheet(d); };
+    g.appendChild(c);
+  }
+}
+$('#calPrev').onclick = () => { const [Y, M] = calMonth.split('-').map(Number); calMonth = dstr(new Date(Y, M - 2, 1)).slice(0, 7); renderCal(); };
+$('#calNext').onclick = () => { const [Y, M] = calMonth.split('-').map(Number); calMonth = dstr(new Date(Y, M, 1)).slice(0, 7); renderCal(); };
+
+function renderTroph() {
+  $('#tRecord').textContent = calc.record; $('#tTotal').textContent = calc.respectes;
+  const ul = $('#formsList'); ul.innerHTML = '';
+  FORMS.forEach((f, i) => { const li = document.createElement('li'); li.className = i < calc.formIdx ? 'done' : i === calc.formIdx ? 'cur' : '';
+    li.innerHTML = `<span class="th"><img src="img/${f.f}.webp" alt="" loading="lazy"></span><span class="d">${f.d} j</span><span class="n">${f.n}<small>${i === calc.formIdx ? 'Forme actuelle' : i < calc.formIdx ? 'Atteinte' : `dans ${f.d - calc.p} jour${f.d - calc.p > 1 ? 's' : ''}`}</small></span>`; ul.appendChild(li); });
+}
+let settingsDirty = false;
+function renderSettings() {
+  if (document.activeElement && $('#tab-regl').contains(document.activeElement)) return; // ne pas écraser une saisie en cours
+  $('#rulesEdit').value = data.rules; $('#baseIn').value = data.base || 0;
+  $('#ghOwner').value = local.owner; $('#ghRepo').value = local.repo; $('#ghToken').value = local.token; $('#vibIn').checked = !!local.vibrate; $('#ver').textContent = VERSION;
+}
+$('#saveRules').onclick = () => { data.rules = $('#rulesEdit').value; data.settings_t = nowSec(); recalc(); persist('réglages'); renderAll(); toast('Règles enregistrées', 'ok'); };
+$('#saveBase').onclick = () => { data.base = Math.max(0, parseInt($('#baseIn').value, 10) || 0); data.settings_t = nowSec(); recalc(); persist('réglages'); renderAll(); toast(`Série de départ : ${data.base}`, 'ok'); };
+$('#saveGh').onclick = () => { local.owner = $('#ghOwner').value.trim(); local.repo = $('#ghRepo').value.trim(); local.token = $('#ghToken').value.trim(); local.sha = null; saveLS(LS_LOCAL, local); renderSync(); toast('Synchro enregistrée', 'ok'); sync(true); };
+$('#forceSync').onclick = () => sync(true);
+$('#vibIn').onchange = e => { local.vibrate = e.target.checked; saveLS(LS_LOCAL, local); };
+$('#exportBtn').onclick = () => { const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `kheper-${today}.json`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); };
+$('#copyBtn').onclick = async () => { try { await navigator.clipboard.writeText(JSON.stringify(data, null, 2)); toast('JSON copié', 'ok'); } catch (_) { toast('Copie impossible ici', 'ko'); } };
+$('#importBtn').onclick = () => $('#importFile').click();
+$('#importFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  let obj; try { obj = JSON.parse(await f.text()); } catch (_) { toast('Fichier illisible : JSON invalide', 'ko'); return; }
+  const err = validateImport(obj); if (err) { toast('Import refusé : ' + err, 'ko', 5000); return; }
+  openSheet(`<h3>Importer</h3><p>${Object.keys(obj.days || {}).length} jour(s) dans le fichier, début ${obj.start || '?'}, série ${obj.base || 0}.</p>
+    <button class="btn gold" id="impMerge">Fusionner avec mes données</button><button class="btn danger" id="impReplace">Remplacer tout</button><button class="btn" id="impCancel">Annuler</button>`);
+  $('#impMerge').onclick = () => { closeSheet(); data = merge(data, obj, today); materialize(data, today); recalc(); persist('import (fusion)'); renderAll(); toast('Import fusionné', 'ok'); };
+  $('#impReplace').onclick = () => { closeSheet(); data = merge(emptyData(today), obj, today); data.rules = obj.rules ?? DEFAULT_RULES; data.base = Number(obj.base) || 0; data.settings_t = nowSec(); data.start = obj.start || data.start; materialize(data, today); recalc(); persist('import (remplacement)'); renderAll(); toast('Données remplacées', 'ok'); };
+  $('#impCancel').onclick = closeSheet;
+};
+$('#resetBtn').onclick = () => {
+  openSheet(`<h3>Remise à zéro</h3><p>Tape <b>RESET</b> pour confirmer. Tout est effacé, ici et sur GitHub.</p><input type="text" id="rzIn" autocomplete="off" autocapitalize="characters">
+    <div class="row2"><button class="btn" id="rzCancel">Annuler</button><button class="btn danger" id="rzOk">Effacer</button></div>`);
+  $('#rzCancel').onclick = closeSheet;
+  $('#rzOk').onclick = () => { if ($('#rzIn').value.trim() !== 'RESET') { toast('Tape RESET pour confirmer', 'ko'); return; } closeSheet(); data = emptyData(today); data.settings_t = nowSec(); local.pending = []; recalc(); persist('remise à zéro'); renderAll(); toast('Remis à zéro', 'ok'); };
+};
+
+/* =====================================================================
+   SYNCHRO GITHUB (API Contents)
+   ===================================================================== */
+let syncState = 'nocfg', syncMsg = '', syncing = false, pushTimer = null;
+function renderSync() {
+  const cfg = local.token && local.owner && local.repo;
+  if (!cfg) syncState = 'nocfg'; else if (!navigator.onLine) syncState = 'offline'; else if (syncState === 'nocfg' || syncState === 'offline') syncState = local.dirty ? 'pending' : 'ok';
+  const s = $('#sync'); s.dataset.s = syncState;
+  const labels = { nocfg: 'local', ok: 'synchronisé', pending: `en attente (${local.pending.length || 1})`, syncing: 'synchro…', offline: 'hors ligne', error: 'erreur' };
+  s.querySelector('span').textContent = labels[syncState];
+  $('#syncDetail').textContent = !cfg ? 'Non configurée : les données restent sur ce téléphone.' : `${local.owner}/${local.repo} · ${labels[syncState]}${syncMsg ? ' — ' + syncMsg : ''}`;
+}
+const b64enc = s => { const u = new TextEncoder().encode(s); let b = ''; for (let i = 0; i < u.length; i += 0x8000) b += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(b); };
+const b64dec = b => new TextDecoder().decode(Uint8Array.from(atob(b.replace(/\s/g, '')), c => c.charCodeAt(0)));
+const ghUrl = () => `https://api.github.com/repos/${local.owner}/${local.repo}/contents/data.json`;
+const ghHeaders = () => ({ Authorization: `Bearer ${local.token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' });
+async function ghGet() {
+  const r = await fetch(ghUrl(), { headers: ghHeaders(), cache: 'no-store' });
+  if (r.status === 404) return { sha: null, data: null };
+  if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'jeton refusé (' + r.status + ')' : 'GitHub ' + r.status);
+  const j = await r.json(); let parsed = null; try { parsed = JSON.parse(b64dec(j.content)); } catch (_) { throw new Error('data.json distant illisible'); }
+  return { sha: j.sha, data: parsed };
+}
+async function ghPut(content, sha, message) {
+  const body = { message, content: b64enc(content) }; if (sha) body.sha = sha;
+  const r = await fetch(ghUrl(), { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (r.status === 409 || r.status === 422) return null; // sha obsolète → l'appelant refusionne
+  if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'jeton refusé (' + r.status + ')' : 'GitHub ' + r.status);
+  return (await r.json()).content.sha;
+}
+function schedulePush() { if (!local.token) return; clearTimeout(pushTimer); pushTimer = setTimeout(() => sync(false), 3000); renderSync(); }
+async function sync(manual) {
+  if (!(local.token && local.owner && local.repo)) { if (manual) toast('Renseigne le compte, le dépôt et le jeton', 'ko'); return; }
+  if (!navigator.onLine) { syncState = 'offline'; renderSync(); if (manual) toast('Hors ligne — synchro dès le retour du réseau'); return; }
+  if (syncing) { local.dirty = true; return; }
+  syncing = true; syncState = 'syncing'; renderSync();
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const remote = await ghGet();
+      if (remote.data) {
+        const err = validateImport(remote.data);
+        if (err) throw new Error('distant invalide : ' + err);
+        const merged = merge(data, remote.data, today);
+        if (canon(merged) !== canon(data)) { data = merged; materialize(data, today); recalc(); saveLS(LS_DATA, data); renderAll(); }
+      }
+      const content = JSON.stringify(data, null, 2);
+      if (remote.data && canon(remote.data) === canon(data)) { local.dirty = false; local.pending = []; local.sha = remote.sha; break; }
+      const msgs = local.pending.length ? local.pending : ['synchro'];
+      const message = msgs.length > 1 ? 'rattrapage : ' + msgs.join(', ') : msgs[0];
+      const sha = await ghPut(content, remote.sha, message.slice(0, 200));
+      if (sha) { local.sha = sha; local.dirty = false; local.pending = []; break; }
+      if (attempt === 2) throw new Error('conflit persistant');
+    }
+    syncState = 'ok'; syncMsg = `dernière synchro ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+    if (manual) toast('Synchronisé', 'ok');
+  } catch (e) {
+    syncState = 'error'; syncMsg = e.message; local.dirty = true; if (manual) toast('Synchro : ' + e.message, 'ko', 5000);
+  } finally { syncing = false; saveLS(LS_LOCAL, local); renderSync(); }
+}
+addEventListener('online', () => { renderSync(); sync(false); });
+addEventListener('offline', renderSync);
+
+/* =====================================================================
+   SCÈNE ANIMÉE (repris de l'atelier)
+   ===================================================================== */
+let power = 0, shownPower = 0, formIdx = 0, animating = false;
+const rgb = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const stage = $('#stage'), charEl = $('#char'), imgA = $('#imgA'), imgB = $('#imgB');
+const auraC = $('#aura'), fxC = $('#fx'), flash = $('#flash'), banner = $('#banner');
+const ac = auraC.getContext('2d'), fc = fxC.getContext('2d');
+let W = 0, H = 0, DPR = 1, front = imgA, back = imgB;
+function resize() {
+  DPR = Math.min(devicePixelRatio || 1, 2); W = stage.clientWidth; H = stage.clientHeight; if (!W || !H) return;
+  for (const c of [auraC, fxC]) { c.width = W * DPR; c.height = H * DPR; }
+  ac.setTransform(DPR, 0, 0, DPR, 0, 0); fc.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const h = Math.min(H * 0.72, W * 1.6);
+  charEl.style.height = h + 'px'; charEl.style.top = (H * 0.04) + 'px'; charEl.style.width = W + 'px';
+}
+addEventListener('resize', resize);
+function geom() { const h = parseFloat(charEl.style.height) || 1, top = parseFloat(charEl.style.top) || 0, w = h * 768 / 889;
+  return { cx: W / 2 + par.x * .3, cy: top + h * .42 + par.y * .3, feetY: top + h * .99, h, w, bodyW: w * .45 }; }
+const par = { x: 0, y: 0, tx: 0, ty: 0 };
+function onOrient(e) { if (e.gamma == null) return; par.tx = Math.max(-1, Math.min(1, e.gamma / 25)) * 14; par.ty = Math.max(-1, Math.min(1, (e.beta - 45) / 25)) * 10; }
+if ('DeviceOrientationEvent' in window && typeof DeviceOrientationEvent.requestPermission !== 'function') addEventListener('deviceorientation', onOrient);
+stage.addEventListener('pointermove', e => { if (e.pointerType !== 'mouse') return; par.tx = (e.clientX / W - .5) * 28; par.ty = (e.clientY / H - .5) * 20; });
+const now = () => performance.now();
+const easeOut = t => 1 - Math.pow(1 - t, 3), easeInOut = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function tween(ms, fn, ease = easeOut) { return new Promise(res => { const t0 = now(); (function step() { const t = Math.min(1, (now() - t0) / ms); fn(ease(t), t); t < 1 ? requestAnimationFrame(step) : res(); })(); }); }
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const vis = { auraScale: 1, auraGain: 1, charScale: 1, dark: 0, shake: 0 };
+const parts = [], bursts = [], bolts = [], rings = [], cracks = []; let boltAcc = 0, ringAcc = 0;
+function spawnPart(cfg, g, fromBottom) { const spread = g.bodyW * 1.8;
+  parts.push({ x: g.cx + (Math.random() - .5) * spread, y: fromBottom ? g.feetY - Math.random() * g.h * .3 : g.feetY - Math.random() * g.h,
+    vx: (Math.random() - .5) * .3 + (cfg.wind ? -.9 - Math.random() * .8 : 0), vy: -(.6 + Math.random() * .9) * cfg.sp,
+    r: cfg.sz * (.35 + Math.random() * .8), life: .6 + Math.random() * .4, decay: .0025 + Math.random() * .003, col: cfg.col, wind: !!cfg.wind }); }
+function spawnBolt(cfg, g) { const side = Math.random() < .5 ? -1 : 1;
+  const sx = g.cx + side * (g.bodyW * (.6 + Math.random() * 1.2)), sy = g.cy - g.h * (.3 + Math.random() * .35);
+  const ex = g.cx + (Math.random() - .5) * g.bodyW * .8, ey = g.cy + (Math.random() - .5) * g.h * .5;
+  const pts = [[sx, sy]]; const n = 7 + (Math.random() * 5 | 0);
+  for (let i = 1; i < n; i++) { const t = i / n; pts.push([sx + (ex - sx) * t + (Math.random() - .5) * 26, sy + (ey - sy) * t + (Math.random() - .5) * 18]); }
+  pts.push([ex, ey]); const branches = [];
+  if (Math.random() < .7) { const k = 2 + (Math.random() * (n - 3) | 0); const [bx, by] = pts[k]; branches.push([[bx, by], [bx + (Math.random() - .5) * 60, by + 20 + Math.random() * 50], [bx + (Math.random() - .5) * 90, by + 50 + Math.random() * 60]]); }
+  bolts.push({ pts, branches, life: 1, col: cfg.col, w: cfg.w }); }
+function makeCracks(g) { cracks.length = 0; const n = 7;
+  for (let i = 0; i < n; i++) { const a = Math.PI + (i / (n - 1)) * Math.PI + (Math.random() - .5) * .3, len = g.bodyW * (.45 + Math.random() * .6);
+    const pts = [[g.cx + (Math.random() - .5) * g.bodyW * .5, g.feetY - 2]]; let x = pts[0][0], y = pts[0][1]; const segs = 4 + (Math.random() * 3 | 0);
+    for (let s = 1; s <= segs; s++) { x += Math.cos(a) * len / segs * (0.7 + Math.random() * .6) * -1; y += Math.abs(Math.sin(a)) * len / segs * .22 + (Math.random() - .5) * 5; pts.push([x, y]); }
+    cracks.push({ pts, w: 1 + Math.random() * 1.5 }); } }
+let last = now(), t0 = now();
+function frame() {
+  requestAnimationFrame(frame);
+  if (activeTab !== 'accueil' || document.hidden || !W) { last = now(); return; }
+  const t = now(), dt = Math.min(50, t - last); last = t; const T = (t - t0) / 1000;
+  const cfg = FORMS[formIdx].fx, g = geom();
+  par.x += (par.tx - par.x) * .06; par.y += (par.ty - par.y) * .06;
+  const breath = REDUCED ? 0 : Math.sin(T * 1.1) * .008;
+  const sx = vis.shake ? (Math.random() - .5) * vis.shake : 0, sy = vis.shake ? (Math.random() - .5) * vis.shake : 0;
+  charEl.style.transform = `translate(${par.x * .5 + sx}px,${par.y * .5 + sy}px)`;
+  const fy = g.feetY - (parseFloat(charEl.style.top) || 0);
+  front.style.transformOrigin = back.style.transformOrigin = `50% ${fy}px`;
+  const cs = vis.charScale * (1 + breath);
+  front.style.transform = back.style.transform = `translateX(-50%) scale(${cs.toFixed(4)})`;
+  front.style.filter = back.style.filter = vis.dark > 0 ? `brightness(${1 - vis.dark * .7}) saturate(${1 - vis.dark * .6})` : '';
+  ac.clearRect(0, 0, W, H);
+  ac.save(); ac.translate(g.cx, g.feetY); ac.scale(1, .18);
+  const sh = ac.createRadialGradient(0, 0, 0, 0, 0, g.bodyW * 1.1); sh.addColorStop(0, 'rgba(0,0,0,.55)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+  ac.fillStyle = sh; ac.fillRect(-g.bodyW * 1.2, -g.bodyW * 1.2, g.bodyW * 2.4, g.bodyW * 2.4); ac.restore();
+  if (cfg.haze && !REDUCED) { ac.save(); ac.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 3; i++) { const ph = T * 1.7 + i * 2.1, wob = Math.sin(ph) * 6; ac.translate(g.cx + wob, g.feetY - 6 - i * 4); ac.scale(1, .22);
+      const hz = ac.createRadialGradient(0, 0, 0, 0, 0, g.bodyW * (1.2 + i * .25)); hz.addColorStop(0, `rgba(255,170,80,${.10 + Math.sin(ph * 1.3) * .03})`); hz.addColorStop(1, 'rgba(255,120,40,0)');
+      ac.fillStyle = hz; ac.fillRect(-g.bodyW * 2, -g.bodyW * 2, g.bodyW * 4, g.bodyW * 4); ac.setTransform(DPR, 0, 0, DPR, 0, 0); }
+    ac.restore(); }
+  if (cfg.aura) { const pulse = cfg.pulse && !REDUCED ? .85 + Math.sin(T * 2.4) * .15 : 1, breathA = REDUCED ? 1 : 1 + Math.sin(T * .9) * .06;
+    const R = g.h * .48 * vis.auraScale * breathA, gain = cfg.ai * vis.auraGain * pulse;
+    ac.save(); ac.globalCompositeOperation = 'lighter'; ac.translate(g.cx + par.x * .2, g.cy + par.y * .2);
+    const paint = (col, mult) => { ac.save(); ac.scale(1, 1.35); const gr = ac.createRadialGradient(0, 0, R * .05, 0, 0, R);
+      gr.addColorStop(0, rgb(col, .55 * gain * mult)); gr.addColorStop(.45, rgb(col, .28 * gain * mult)); gr.addColorStop(1, rgb(col, 0)); ac.fillStyle = gr; ac.fillRect(-R * 1.5, -R * 1.5, R * 3, R * 3); ac.restore(); };
+    if (cfg.aura === 'prism') { paint([140, 60, 255], .9); ac.translate(Math.cos(T * 1.3) * R * .15, Math.sin(T * 1.3) * R * .1); paint([255, 200, 80], .55); ac.translate(-Math.cos(T * 1.3) * R * .3, -Math.sin(T * 1.3) * R * .2); paint([255, 120, 200], .25); }
+    else paint(cfg.aura, 1);
+    ac.restore(); }
+  if (cfg.cracks) { if (!cracks.length || cracks._cx !== g.cx) { makeCracks(g); cracks._cx = g.cx; }
+    ac.save(); ac.globalCompositeOperation = 'lighter'; ac.lineCap = 'round'; const glow = .5 + (REDUCED ? 0 : Math.sin(T * 2.2) * .25);
+    for (const c of cracks) { ac.beginPath(); c.pts.forEach((p, i) => i ? ac.lineTo(p[0], p[1]) : ac.moveTo(p[0], p[1]));
+      ac.strokeStyle = `rgba(212,175,55,${.18 * glow})`; ac.lineWidth = c.w + 5; ac.stroke(); ac.strokeStyle = `rgba(255,230,140,${.8 * glow})`; ac.lineWidth = c.w; ac.stroke(); }
+    ac.restore(); }
+  fc.clearRect(0, 0, W, H);
+  if (!REDUCED && cfg.parts) { while (parts.length < cfg.parts.n) spawnPart(cfg.parts, g, Math.random() < .8); }
+  fc.save(); fc.globalCompositeOperation = 'lighter';
+  for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i];
+    p.x += p.vx * dt * .06 + (p.wind ? Math.sin(T * 3 + p.y * .02) * .3 : Math.sin(T * 2 + p.y * .05) * .08); p.y += p.vy * dt * .06; p.life -= p.decay * dt * .06;
+    if (p.life <= 0 || p.y < -20 || p.x < -40) { parts.splice(i, 1); continue; }
+    const a = Math.min(1, p.life * 1.5) * .9;
+    if (p.wind) { fc.strokeStyle = rgb(p.col, a * .7); fc.lineWidth = p.r * .6; fc.beginPath(); fc.moveTo(p.x, p.y); fc.lineTo(p.x + 14, p.y - 2); fc.stroke(); }
+    else { fc.fillStyle = rgb(p.col, a); fc.beginPath(); fc.arc(p.x, p.y, p.r, 0, 7); fc.fill(); fc.fillStyle = rgb(p.col, a * .25); fc.beginPath(); fc.arc(p.x, p.y, p.r * 2.6, 0, 7); fc.fill(); } }
+  for (let i = bursts.length - 1; i >= 0; i--) { const b = bursts[i]; b.x += b.vx * dt * .06; b.y += b.vy * dt * .06; b.vx *= .96; b.vy *= .96; b.life -= .022 * dt * .06;
+    if (b.life <= 0) { bursts.splice(i, 1); continue; } fc.fillStyle = rgb(b.col, b.life); fc.beginPath(); fc.arc(b.x, b.y, b.r * b.life, 0, 7); fc.fill(); }
+  if (!REDUCED && cfg.bolts) { boltAcc += dt / 1000 * cfg.bolts.rate; if (boltAcc > 1) { boltAcc = 0; spawnBolt(cfg.bolts, g); if (Math.random() < .4) spawnBolt(cfg.bolts, g); } }
+  fc.lineCap = 'round'; fc.lineJoin = 'round';
+  for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i]; b.life -= dt / 160; if (b.life <= 0) { bolts.splice(i, 1); continue; } const a = Math.min(1, b.life * 1.6);
+    const draw = (pts, w) => { fc.beginPath(); pts.forEach((p, k) => k ? fc.lineTo(p[0], p[1]) : fc.moveTo(p[0], p[1])); fc.strokeStyle = rgb(b.col, a * .25); fc.lineWidth = w * 4; fc.stroke();
+      fc.strokeStyle = rgb(b.col, a); fc.lineWidth = w; fc.stroke(); fc.strokeStyle = `rgba(255,255,255,${a * .9})`; fc.lineWidth = w * .4; fc.stroke(); };
+    draw(b.pts, b.w); b.branches.forEach(br => draw(br, b.w * .6)); }
+  if (!REDUCED && cfg.rings) { ringAcc += dt; if (ringAcc > 1400) { ringAcc = 0; rings.push({ r: g.bodyW * .5, life: 1, col: [255, 209, 102], w: 2, sp: .55, tilt: .22 + Math.random() * .1 }); } }
+  for (let i = rings.length - 1; i >= 0; i--) { const r = rings[i]; r.r += r.sp * dt * .12 * (r.shock ? 3 : 1); r.life -= dt / (r.shock ? 700 : 2600); if (r.life <= 0) { rings.splice(i, 1); continue; }
+    fc.save(); fc.translate(g.cx, r.shock ? g.cy : g.cy + g.h * .05); fc.scale(1, r.tilt); fc.strokeStyle = rgb(r.col, r.life * (r.shock ? .9 : .7)); fc.lineWidth = r.w * (r.shock ? (1 + r.life * 6) : 1);
+    fc.beginPath(); fc.arc(0, 0, r.r, 0, 7); fc.stroke(); fc.strokeStyle = rgb(r.col, r.life * .2); fc.lineWidth = r.w * 5; fc.stroke(); fc.restore(); }
+  fc.restore();
+  if (Math.abs(shownPower - power) > .01) { shownPower += (power - shownPower) * .12; if (Math.abs(shownPower - power) < .05) shownPower = power; renderPower(); }
+}
+const src = f => `img/${f}.webp`;
+function setForm(i, instant) { const changed = i !== formIdx; formIdx = i; if (changed) { parts.length = 0; bolts.length = 0; rings.length = 0; cracks.length = 0; }
+  if (instant) { const s = src(FORMS[i].f); if (!front.getAttribute('src') || !front.src.endsWith(s)) { front.src = s; front.style.opacity = 1; back.style.opacity = 0; } } }
+async function crossfade(i, ms) { back.src = src(FORMS[i].f); await back.decode().catch(() => {}); back.style.transition = front.style.transition = `opacity ${ms}ms ease`;
+  back.style.opacity = 1; front.style.opacity = 0; await wait(ms); [front, back] = [back, front]; }
+function burst(g, col, n) { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, v = 3 + Math.random() * 7;
+  bursts.push({ x: g.cx, y: g.cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 2 + Math.random() * 3, life: 1, col: Math.random() < .5 ? col : [255, 255, 255] }); } }
+async function doFlash(peak, ms) { flash.style.transition = 'none'; flash.style.opacity = peak; await wait(30); flash.style.transition = `opacity ${ms}ms ease-out`; flash.style.opacity = 0; }
+async function fxCoche(fromIdx) {
+  animating = true; const g = geom(), col = FORMS[fromIdx].fx.aura && FORMS[fromIdx].fx.aura !== 'prism' ? FORMS[fromIdx].fx.aura : [242, 201, 76];
+  vibrate([30, 40, 70]);
+  if (!REDUCED) { burst(g, col, 90); rings.push({ r: g.bodyW * .3, life: 1, col, w: 3, sp: 1, tilt: .5, shock: true }); }
+  doFlash(REDUCED ? .35 : .85, 380);
+  tween(160, t => vis.charScale = 1 + .12 * t).then(() => tween(520, t => vis.charScale = 1.12 - .12 * t, easeInOut));
+  tween(700, t => vis.auraGain = 1 + 1.2 * (1 - t));
+  await fxSetPower(fromIdx); animating = false;
+}
+async function fxCroix(fromIdx) {
+  animating = true; vibrate(450);
+  tween(550, t => { vis.auraGain = 1 - t; vis.auraScale = 1 + t * .7; }); tween(300, t => vis.dark = t);
+  await wait(350); await fxSetPower(fromIdx);
+  await tween(900, t => { vis.dark = 1 - t; vis.auraGain = t; vis.auraScale = 1.7 - .7 * t; }, easeInOut); animating = false;
+}
+async function fxSetPower(fromIdx) { power = calc.p; const to = calc.formIdx; renderHud(); if (to > fromIdx) await palierUp(to); else if (to < fromIdx) await palierDown(to); }
+async function palierUp(i) { const g = geom();
+  await tween(420, t => { vis.auraScale = 1 - .75 * t; vis.auraGain = 1 + 1.6 * t; }, easeInOut);
+  if (!REDUCED) { vis.shake = 9; setTimeout(() => vis.shake = 0, 520); }
+  doFlash(REDUCED ? .4 : 1, 600);
+  if (!REDUCED) { rings.push({ r: g.bodyW * .2, life: 1, col: [255, 240, 200], w: 4, sp: 1.6, tilt: .45, shock: true }); burst(g, [242, 201, 76], 60); }
+  setForm(i, false);
+  await Promise.all([crossfade(i, REDUCED ? 500 : 650), tween(900, t => { vis.auraScale = .25 + .75 * t; vis.auraGain = 2.6 - 1.6 * t; })]);
+  renderHud(); banner.querySelector('b').textContent = FORMS[i].n; banner.style.transition = 'opacity .35s ease'; banner.style.opacity = 1;
+  vibrate([60, 60, 120]);
+  await wait(1500); banner.style.transition = 'opacity .6s ease'; banner.style.opacity = 0; await wait(300); }
+async function palierDown(i) { tween(500, t => vis.auraGain = 1 - t); setForm(i, false); await crossfade(i, 900); renderHud(); await tween(700, t => { vis.auraGain = t; vis.auraScale = 1; }); }
+
+/* =====================================================================
+   DÉMARRAGE
+   ===================================================================== */
+function boot() {
+  const news = materialize(data, today); recalc();
+  if (news.length) persist(news.map(d => `${d} oubli −15`).join(', ')); else saveLS(LS_DATA, data);
+  power = shownPower = calc.p; formIdx = calc.formIdx; setForm(formIdx, true);
+  resize(); renderAll(); requestAnimationFrame(frame);
+  if (news.length) notifyOublis(news);
+  FORMS.forEach(f => { const im = new Image(); im.src = src(f.f); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { refreshToday(); resize(); if (local.dirty || syncState === 'error') sync(false); } });
+  setInterval(refreshToday, 30000);
+  if (local.token) sync(false);
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(boot, boot); else boot();
+})();
+</script>
+</body>
+</html>
