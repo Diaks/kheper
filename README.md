@@ -1,5 +1,7 @@
 # Kheper — déploiement
 
+> **État au 16/09/2026 : déployé.** Site : https://diaks.github.io/kheper/ — dépôts `Diaks/kheper` (public, Pages activé sur `main` / root, HTTPS imposé) et `Diaks/kheper-data` (privé). Jetons : `kheper-app` (Contents R/W sur `kheper-data`, sans expiration, utilisé par l'app) et `kheper-deploy` (temporaire, expire le 23/09/2026, a servi au push et peut être supprimé). Le dossier `~/Documents/kheper/installation/` contient le QR code et le lien de configuration pour le téléphone.
+
 Deux dépôts sur le compte **Diaks** :
 
 | Dépôt | Visibilité | Contenu |
@@ -20,14 +22,15 @@ Ouvre `http://localhost:8080` sur le Mac. Pour tester sur le téléphone en loca
 
 ## 2. Dépôt `kheper` (le site)
 
+Le dossier est déjà un dépôt git (branche `main`, un commit « Kheper v1 », `atelier.html` ignoré). Il reste à créer le dépôt distant et à pousser :
+
+1. https://github.com/new → nom `kheper`, **Public**, sans README ni .gitignore → Create repository.
+2. Dans le Terminal du Mac :
+
 ```bash
 cd ~/Documents/kheper/app
-git init -b main
-git add index.html manifest.json sw.js icon-192.png icon-512.png img/ README.md
-git commit -m "Kheper v1"
-gh repo create Diaks/kheper --public --source=. --push
-# sans gh : crée le dépôt vide sur github.com puis
-# git remote add origin git@github.com:Diaks/kheper.git && git push -u origin main
+git remote add origin https://github.com/Diaks/kheper.git
+git push -u origin main
 ```
 
 Puis sur GitHub : **Settings → Pages → Build and deployment → Source : Deploy from a branch → Branch : `main` / `(root)` → Save**. Après une à deux minutes, le site est à :
@@ -44,13 +47,16 @@ Le `manifest.json` et le `sw.js` utilisent des chemins relatifs (`./`), donc le 
 
 ## 3. Dépôt `kheper-data` (les données)
 
-Crée-le **privé**, avec un README ou vide, peu importe : l'app crée `data.json` elle-même au premier push s'il n'existe pas. Si tu préfères partir d'un fichier, mets `data.json` avec :
+`~/Documents/kheper/kheper-data/` est aussi déjà un dépôt git avec un `data.json` vide valide.
 
-```json
-{ "version": 1, "start": "2026-09-16", "base": 0, "rules": "", "settings_t": 0, "days": {} }
+1. https://github.com/new → nom `kheper-data`, **Private**, sans README → Create repository.
+2. Terminal :
+
+```bash
+cd ~/Documents/kheper/kheper-data
+git remote add origin https://github.com/Diaks/kheper-data.git
+git push -u origin main
 ```
-
-(Un `rules` vide est remplacé par le texte par défaut.)
 
 ## 4. Le jeton (fine-grained personal access token)
 
@@ -65,7 +71,7 @@ Copie le jeton (`github_pat_…`) : il n'est affiché qu'une fois.
 
 ## 5. Dans l'app
 
-Réglages → **Synchronisation GitHub** : compte `Diaks`, dépôt `kheper-data`, colle le jeton, **Enregistrer**. L'indicateur en haut à droite passe à « synchronisé ». Le jeton reste dans le stockage local du téléphone, jamais dans `data.json`.
+Deux façons : (a) ouvrir le lien de configuration `https://diaks.github.io/kheper/#cfg=<base64 de {"owner","repo","token"}>` — l'app enregistre la synchro et efface le hash (c'est ce que fait le QR code du dossier `installation/`) ; (b) Réglages → **Synchronisation GitHub** : compte `Diaks`, dépôt `kheper-data`, colle le jeton, **Enregistrer**. L'indicateur en haut à droite passe à « synchronisé ». Le jeton reste dans le stockage local du téléphone, jamais dans `data.json`.
 
 ## 6. Installer sur Android
 
